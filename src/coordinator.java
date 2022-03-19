@@ -1,4 +1,4 @@
-public class Coordinator {
+public class coordinator {
 
     public static void main(String[] args) {
 
