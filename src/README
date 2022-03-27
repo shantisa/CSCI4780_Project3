@@ -4,7 +4,19 @@ Samuel Jackson
 Terique Mick
 
 How to compile and run on nike:
+Note: You must run the files on two separate terminals in nike.
+Examples are listed below for compiling and running both the coordinator
+and participant files.
 
+Coordinator
+javac coordinator.java
+java coordinator (config file)
+Example run: java coordinator PP3-coordinator-conf.txt
+
+Participant
+javac participant.java
+java participant (config file)
+Example run: java participant PP3-participant-conf.txt
 
 Statement:
 This project was done in its entirety by Shantisa Strowder, Samuel Jackson,

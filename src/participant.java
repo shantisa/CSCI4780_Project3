@@ -1,10 +1,14 @@
 import java.io.*;
 import java.net.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.*;
 
+import static java.nio.file.StandardOpenOption.APPEND;
+import static java.nio.file.StandardOpenOption.CREATE;
+
 public class participant {
-    //initialize socket
-    Socket socket = null;
 
     public static void main(String[] args) {
         try {
@@ -26,21 +30,15 @@ public class participant {
             String ip = scanner.next();
             String port = scanner.next();
 
-            //establish connection to coordinator
-            socket = new Socket(ip, Integer.parseInt(port));
-
+            File log = new File(logFile);
+            log.delete();
 
             //create a new thread for receiving user commands
-            ReceiveCommand commandThread = new ReceiveCommand(socket);
+            ReceiveCommand commandThread = new ReceiveCommand(ip, Integer.parseInt(port), particpantID, log);
             commandThread.start();
 
-            //create a new thread for receiving multicast messages from the coordinator
-            ReceiveMulticast multicastThread = new ReceiveMulticast(socket);
-            multicastThread.start();
 
-
-        } catch (Exception e){
-            socket.close();
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
@@ -49,60 +47,137 @@ public class participant {
 }
 
 class ReceiveCommand extends Thread {
-    Socket socket = null;
-    DataInputStream inputStream = null;
-    DataOutputStream outputStream = null;
+    Scanner scanner = new Scanner(System.in);
+    ReceiveMulticast receiver;
+    String id;
+    File log;
+    String ip;
+    int port;
 
     //Constructor
-    public ReceiveCommand(Socket socket) {
+    public ReceiveCommand(String ip, int port, String id, File log) {
         try {
-            this.socket = socket;
-            inputStream = new DataInputStream(socket.getInputStream());
-            outputStream = new DataOutputStream(socket.getOutputStream());
+            this.ip = ip;
+            this.port = port;
+            this.id = id;
+            this.log = log;
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
     public void run() {
-        try {
-            while (true) {
-                String command = inputStream.readUTF();
+        while (true) {
+            try (Socket socket = new Socket(ip, port)) {
+                System.out.print(id + "> ");
+                String line = scanner.nextLine().trim();
+                String[] commands = line.split(" ");
+                String command = commands[0];
+                DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
+                DataInputStream inputStream = new DataInputStream(socket.getInputStream());
 
-                if(command.equals("register")){
-
-                }else if(command.equals("deregister")){
-
-                } else if(command.equals("disconnect")){
-
-                } else if(command.equals("reconnect")){
-
-                }else if(command.equals("msend")){
-
-                }else{
+                if (command.equals("register")) {
+                    if (receiver != null) {
+                        System.out.println("receiver is already registered, deregister before registering again");
+                        continue;
+                    }
+                    int port = Integer.parseInt(commands[1]);
+                    //create a new thread for receiving multicast messages from the coordinator
+                    receiver = new ReceiveMulticast(log);
+                    receiver.connect(port);
+                    outputStream.writeUTF(command);
+                    outputStream.writeUTF(id);
+                    outputStream.writeInt(port);
+                } else if (command.equals("deregister")) {
+                    if (receiver == null) {
+                        System.out.println("receiver is not registered, register first");
+                        continue;
+                    }
+                    outputStream.writeUTF(command);
+                    outputStream.writeUTF(id);
+                    receiver.disconnect();
+                    receiver = null;
+                } else if (command.equals("disconnect")) {
+                    if (receiver == null) {
+                        System.out.println("receiver is not registered, register first");
+                        continue;
+                    } else if (!receiver.isRunning()) {
+                        System.out.println("receiver has already disconnected");
+                        continue;
+                    }
+                    outputStream.writeUTF(command);
+                    outputStream.writeUTF(id);
+                    receiver.disconnect();
+                } else if (command.equals("reconnect")) {
+                    if (receiver == null) {
+                        System.out.println("receiver is not registered, register first");
+                        continue;
+                    } else if (receiver.isRunning()) {
+                        System.out.println("receiver already connected, disconnect first");
+                        continue;
+                    }
+                    int port = Integer.parseInt(commands[1]);
+                    receiver.connect(port);
+                    outputStream.writeUTF(command);
+                    outputStream.writeUTF(id);
+                    outputStream.writeInt(port);
+                } else if (command.equals("msend")) {
+                    outputStream.writeUTF(command);
+                    outputStream.writeUTF(id);
+                    outputStream.writeUTF(line.substring(6));
+                    String ack = inputStream.readUTF();
+                    System.out.println(ack);
+                } else if (command.equals("quit")) {
+                    outputStream.writeUTF(command);
+                    outputStream.writeUTF(id);
+                    System.exit(0);
+                } else {
                     System.out.println("Command doesn't exist, please try again");
                 }
+            } catch (Exception ignored) {
+                System.out.println("Please pay attention to the number and validity of command arguments");
             }
-        } catch (Exception e){
-            e.printStackTrace();
         }
     }
 }
 
-class ReceiveMulticast extends Thread {
-    Socket socket = null;
-    DataInputStream inputStream = null;
-    DataOutputStream outputStream = null;
+class ReceiveMulticast {
+    ServerSocket socket = null;
+    boolean running = false;
+    Thread thread;
+    File log;
 
     //Constructor
-    public ReceiveMulticast(Socket socket) {
-        try {
-            this.socket = socket;
-            inputStream = new DataInputStream(socket.getInputStream());
-            outputStream = new DataOutputStream(socket.getOutputStream());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    public ReceiveMulticast(File log) {
+        this.log = log;
+    }
 
+    public void connect(int port) throws IOException {
+        if (socket != null) {
+            socket.close();
+        }
+        socket = new ServerSocket(port);
+        running = true;
+        thread = new Thread(() -> {
+            while (true) {
+                try (Socket receiver = socket.accept()) {
+                    DataInputStream inputStream = new DataInputStream(receiver.getInputStream());
+                    String message = inputStream.readUTF();
+                    Files.writeString(log.toPath(), message+ "\n", CREATE, APPEND);
+                } catch (Exception ignored) {
+                }
+            }
+        });
+        thread.start();
+    }
+
+    public boolean isRunning() {
+        return running;
+    }
+
+    public void disconnect() throws IOException {
+        running = false;
+        thread.interrupt();
+        socket.close();
     }
 }
