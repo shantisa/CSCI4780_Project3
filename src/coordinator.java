@@ -73,7 +73,7 @@ class CommandParser extends Thread {
             if(command.equals("register")){
                 int port = inputStream.readInt();
                 if(registry.get(id) != null){
-                    System.out.println("receiver is already registered");
+                    outputStream.writeUTF("receiver is already registered");
                 }else{
                     Participant participant = new Participant(port, socket.getInetAddress());
                     registry.put(id,participant);
@@ -81,7 +81,7 @@ class CommandParser extends Thread {
                 }
             }else if(command.equals("deregister")){
                 if(registry.get(id) == null){
-                    System.out.println("receiver is not registered");
+                    outputStream.writeUTF("receiver is not registered");
                 }
                 else{
                     registry.remove(id);
@@ -90,7 +90,7 @@ class CommandParser extends Thread {
             } else if(command.equals("disconnect")){
                 Participant state = registry.get(id);
                 if(state == null){
-                    System.out.println("receiver is not registered");
+                    outputStream.writeUTF("receiver is not registered");
                 }
                 else{
                     state.dc();
@@ -100,7 +100,7 @@ class CommandParser extends Thread {
                 int port = inputStream.readInt();
                 Participant state = registry.get(id);
                 if(state == null){
-                    System.out.println("receiver is not registered");
+                    outputStream.writeUTF("receiver is not registered");
                 }
                 else{
                     state.reconnect(port);
@@ -109,7 +109,9 @@ class CommandParser extends Thread {
             }else if(command.equals("msend")){
                 Participant state = registry.get(id);
                 if(state == null){
-                    System.out.println("receiver is not registered, you cannot send a message");
+                    outputStream.writeUTF("receiver is not registered, you cannot send a message");
+                } else if(!state.getOnline()){
+                    outputStream.writeUTF("receiver is disconnected, reconnect first");
                 }
                 long now = System.currentTimeMillis();
                 String message = inputStream.readUTF();
@@ -166,6 +168,10 @@ class CommandParser extends Thread {
             else if(keepAliveValid(now,timeout)){
                 saveMessage(message);
             }
+        }
+
+        public boolean getOnline(){
+            return online;
         }
 
         private void sendMessage(String message){

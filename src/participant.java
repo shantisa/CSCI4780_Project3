@@ -133,6 +133,9 @@ class ReceiveCommand extends Thread {
                     if (receiver == null) {
                         System.out.println("receiver is not registered, register first");
                         continue;
+                    } else if (!receiver.isRunning()) {
+                        System.out.println("receiver is disconnected, reconnect first");
+                        continue;
                     }
                     outputStream.writeUTF(command);
                     outputStream.writeUTF(id);
