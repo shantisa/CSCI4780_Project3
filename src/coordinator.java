@@ -77,6 +77,7 @@ class CommandParser extends Thread {
                 }else{
                     Participant participant = new Participant(port, socket.getInetAddress());
                     registry.put(id,participant);
+                    outputStream.writeUTF("participant is registered");
                 }
             }else if(command.equals("deregister")){
                 if(registry.get(id) == null){
@@ -84,6 +85,7 @@ class CommandParser extends Thread {
                 }
                 else{
                     registry.remove(id);
+                    outputStream.writeUTF("participant is deregistered");
                 }
             } else if(command.equals("disconnect")){
                 Participant state = registry.get(id);
@@ -92,6 +94,7 @@ class CommandParser extends Thread {
                 }
                 else{
                     state.dc();
+                    outputStream.writeUTF("participant is disconnected");
                 }
             } else if(command.equals("reconnect")){
                 int port = inputStream.readInt();
@@ -101,8 +104,13 @@ class CommandParser extends Thread {
                 }
                 else{
                     state.reconnect(port);
+                    outputStream.writeUTF("participant is reconnected");
                 }
             }else if(command.equals("msend")){
+                Participant state = registry.get(id);
+                if(state == null){
+                    System.out.println("receiver is not registered, you cannot send a message");
+                }
                 long now = System.currentTimeMillis();
                 String message = inputStream.readUTF();
                 outputStream.writeUTF("message acknowledged");

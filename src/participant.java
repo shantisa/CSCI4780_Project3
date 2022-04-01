@@ -88,6 +88,8 @@ class ReceiveCommand extends Thread {
                     outputStream.writeUTF(command);
                     outputStream.writeUTF(id);
                     outputStream.writeInt(port);
+                    String ack = inputStream.readUTF();
+                    System.out.println(ack);
                 } else if (command.equals("deregister")) {
                     if (receiver == null) {
                         System.out.println("receiver is not registered, register first");
@@ -97,6 +99,8 @@ class ReceiveCommand extends Thread {
                     outputStream.writeUTF(id);
                     receiver.disconnect();
                     receiver = null;
+                    String ack = inputStream.readUTF();
+                    System.out.println(ack);
                 } else if (command.equals("disconnect")) {
                     if (receiver == null) {
                         System.out.println("receiver is not registered, register first");
@@ -108,6 +112,8 @@ class ReceiveCommand extends Thread {
                     outputStream.writeUTF(command);
                     outputStream.writeUTF(id);
                     receiver.disconnect();
+                    String ack = inputStream.readUTF();
+                    System.out.println(ack);
                 } else if (command.equals("reconnect")) {
                     if (receiver == null) {
                         System.out.println("receiver is not registered, register first");
@@ -121,7 +127,13 @@ class ReceiveCommand extends Thread {
                     outputStream.writeUTF(command);
                     outputStream.writeUTF(id);
                     outputStream.writeInt(port);
+                    String ack = inputStream.readUTF();
+                    System.out.println(ack);
                 } else if (command.equals("msend")) {
+                    if (receiver == null) {
+                        System.out.println("receiver is not registered, register first");
+                        continue;
+                    }
                     outputStream.writeUTF(command);
                     outputStream.writeUTF(id);
                     outputStream.writeUTF(line.substring(6));
@@ -163,7 +175,12 @@ class ReceiveMulticast {
                 try (Socket receiver = socket.accept()) {
                     DataInputStream inputStream = new DataInputStream(receiver.getInputStream());
                     String message = inputStream.readUTF();
-                    Files.writeString(log.toPath(), message+ "\n", CREATE, APPEND);
+                    BufferedWriter bw = new BufferedWriter(new FileWriter(log, true));
+                    bw.write(message);
+                    bw.newLine();
+                    bw.close();
+
+                    //Files.writeString(log.toPath(), message+ "\n", CREATE, APPEND);
                 } catch (Exception ignored) {
                 }
             }
